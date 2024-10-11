@@ -9,6 +9,33 @@ class AinedError extends Error {
     }
 }
 
+type WidgetButton = {
+    text?: string,
+    image: {
+        link?: string,
+        size: string
+    },
+    width: string
+    height: string
+    direction: string
+    justify: string
+    radius: number
+    gap: number
+    padding: number
+    reversed: boolean
+    background: string
+    animation: string
+    font: {
+        size: number
+        weight: number
+        color: string
+    },
+    border: {
+        color: string
+        width: number
+    }
+}
+
 class AinedWidget {
 
     private config = {
@@ -40,6 +67,119 @@ class AinedWidget {
     }
 
     private z = (number: number) => 999999 + number
+
+    private render = (button: WidgetButton) => { 
+
+        const justify = {
+            'left': 'start',
+            'center': 'center',
+            'right': 'end'
+        }
+    
+    
+        const animation = {
+            'bounce': 'animation: ained-widget-bounce-animation 1s infinite;',
+            'pulse': 'animation: ained-widget-pulse-animation 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;',
+            'ping': 'animation: ained-widget-ping-animation 1s cubic-bezier(0, 0, 0.2, 1) infinite;',
+            'none': ''
+        }
+    
+        const text = button.text ? [`
+            <span style="
+                font-family: inherit;
+                font-size: ${button.font.size}px;
+                font-weight: ${button.font.weight};
+                color: #${button.font.color};
+                ${ button.image.size === '100%' ? `
+                    width: calc(100% - ${button.padding*2}px);
+                    text-align: ${button.justify};
+                    position: absolute; top: 50%; left: 50%;
+                    transform: translate(-50%, -50%);
+                ` : ``}
+            ">${button.text}</span>
+        `] : []
+        const image = button.image.link ? [`
+            <img src="${button.image.link}" style="
+    
+                ${ button.image.size === '100%' ? `
+                    width: ${button.image.size}; 
+                    max-width: ${button.image.size}; 
+                    min-width: ${button.image.size};
+                    height: ${button.image.size}; 
+                    max-height: ${button.image.size}; 
+                    min-height: ${button.image.size};
+                    border-radius: ${button.radius}px;
+                    object-fit: cover;
+                    position: absolute;
+                    top: 0px;
+                    left: 0px;
+                ` : `
+                    width: ${button.image.size}; 
+                    max-width: ${button.image.size}; 
+                    min-width: ${button.image.size};
+                `}
+            " />
+        `] : []
+    
+        const elements = !button.reversed || button.image.size === '100%' ?  [...image, ...text] : [...text, ...image]
+    
+        return elements.length === 0 ? undefined : `
+        <style>
+            @keyframes ained-widget-bounce-animation {
+                0%, 100% {
+                    transform: translateY(-25%);
+                    animation-timing-function: cubic-bezier(0.8,0,1,1);
+                }
+                50% {
+                    transform: none;
+                    animation-timing-function: cubic-bezier(0,0,0.2,1);
+                }
+            }
+            @keyframes ained-widget-pulse-animation {
+                50% {
+                    opacity: .5;
+                }
+            }
+            div[data-ained-widget-button] * {
+                user-select: none;
+            }
+            div[data-ained-widget-button] {
+                cursor: pointer;
+                transition-property: all !important;
+                transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+                transition-duration: 150ms !important;
+            }
+            div[data-ained-widget-button]:hover {
+                opacity: .7;
+            }
+        </style>
+        <div data-ained-widget-button style="
+            min-width: ${button.width}${button.width === 'fit-content' ? '' : 'px'}; 
+            min-height: ${button.height}${button.height === 'fit-content' ? '' : 'px'};
+            width: ${button.width}${button.width === 'fit-content' ? '' : 'px'}; 
+            height: ${button.height}${button.height === 'fit-content' ? '' : 'px'};
+            max-width: 500px;
+            max-height: 500px;
+            border-radius: ${button.radius}px;
+            padding-left: ${button.padding / (button.direction === 'column' ? 2 : 1)}px;
+            padding-right: ${button.padding / (button.direction === 'column' ? 2 : 1)}px;
+            padding-top: ${button.padding / (button.direction === 'row' ? 2 : 1)}px;
+            padding-bottom: ${button.padding / (button.direction === 'row' ? 2 : 1)}px;
+            flex-direction: ${button.direction};
+            justify-content: ${justify[button.justify as 'center' | 'left' | 'right' ]};
+            white-space: nowrap;
+            text-wrap: nowrap;
+            gap: ${button.gap}px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            background: #${button.background};
+            outline: ${button.border.width}px solid #${button.border.color};
+            ${animation[button.animation as 'none' | 'pulse' | 'ping' | 'bounce']}
+        ">
+            ${elements.join('\n')}
+        </div>
+    `}
 
     // Minified JavaScript implementation of SHA-256 by https://geraintluff.github.io/sha256/
     // @ts-expect-error 
@@ -186,7 +326,7 @@ class AinedWidget {
     }
 
     private append = {
-        button: () => {
+        button: () => { try {
             if (this.button) return
             const event = new CustomEvent('ained-button-show')
             if (!this.meta?.visual.button.enabled) return
@@ -197,14 +337,14 @@ class AinedWidget {
             wrapper.setAttribute('id', `ained-${this.id}-button-wrapper`)
             button.setAttribute('class', `ained-${this.id}-button`)
             button.setAttribute('id', `ained-${this.id}-button`)
-            button.innerHTML = this.meta.visual.button.template
+            button.innerHTML = this.render(JSON.parse(this.meta.visual.button.template)) || ''
             button.addEventListener('click', this.append.app)
             this.button = button
             wrapper.appendChild(button)
             this.container.appendChild(wrapper)
             dispatchEvent(event)
             setTimeout(() => wrapper.setAttribute('style', `opacity: 1; transition-duration: 500ms !important;`), 1)
-        },
+        } catch (e) { throw new AinedError(`${e}`)}},
         app: () => {
             if (this.app) return;
             const event = new CustomEvent('ained-app-show')
